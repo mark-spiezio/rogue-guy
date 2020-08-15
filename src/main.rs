@@ -1,7 +1,7 @@
 use tcod::colors::*;
 use tcod::console::*;
 use tcod::map::{Map as FovMap};
-use tcod::input::{self, Event, Key, Mouse};
+use tcod::input::{self, Event, Key };
 use rand::Rng;
 
 mod game_object;
@@ -80,7 +80,7 @@ fn main() {
             _ => tcod.key = Default::default()
         }
 
-        render_all(&mut tcod, &mut game, &objects, fov_recompute);
+        game::render_all(&mut tcod, &mut game, &objects, fov_recompute);
 
         tcod.root.flush();
 
@@ -139,6 +139,18 @@ fn handle_keys(tcod: &mut game::Tcod, game: &mut game::Game, objects: &mut Vec<g
             }
             DidntTakeTurn
         }
+        (Key { code: Text, ..}, "d", true) => {
+            //show the inventory; if an item is selected, drop it
+            let inventory_index = menu::inventory_menu(
+                &game.inventory,
+                "",
+                &mut tcod.root
+            );
+            if let Some(inventory_index) = inventory_index {
+                game_object::drop_item(inventory_index, game, objects);
+            }
+            DidntTakeTurn
+        }
         (Key { code: Text, ..}, "i", true) => {
             let inventory_index = menu::inventory_menu(
                 &game.inventory, 
@@ -154,111 +166,6 @@ fn handle_keys(tcod: &mut game::Tcod, game: &mut game::Game, objects: &mut Vec<g
     }
 }
 
-fn render_all(tcod: &mut game::Tcod, game: &mut game::Game, objects: &[game_object::GameObject], fov_recompute: bool) {
-    if fov_recompute  {
-        // recompute FOV if needed (the player moved or something)
-        let player = &objects[game_object::PLAYER];
-        tcod.fov.compute_fov(
-            player.x, 
-            player.y, 
-            map::TORCH_RADIUS,
-            map::FOV_LIGHT_WALLS,
-            map::FOV_ALGO
-        );
-    }    
-
-    for y in 0..map::MAP_HEIGHT {
-        for x in 0..map::MAP_WIDTH {
-            let visable = tcod.fov.is_in_fov(x, y);
-            let wall = game.game_map[x as usize][y as usize].block_sight;
-            let color = match(visable, wall) {
-                (false, true) => map::COLOR_DARK_WALL,
-                (false, false) => map::COLOR_DARK_GROUND,
-                (true, true) => map::COLOR_LIGHT_WALL,
-                (true, false) => map::COLOR_LIGHT_GROUND,
-            };
-                
-            let explored = &mut game.game_map[x as usize][y as usize].explored;
-            if visable {
-                *explored = true
-            }
-            if *explored {
-                tcod.con.set_char_background(x, y, color, BackgroundFlag::Set);
-            }
-        }
-    }
-
-
-    // draw objects in the list
-    let mut to_draw: Vec<_> = objects
-        .iter()
-        .filter(|o| 
-                tcod.fov.is_in_fov(o.x, o.y)
-                    || (o.always_visible && game.game_map[o.x as usize][o.y as usize].explored)
-            )
-        .collect();
-    to_draw.sort_by(|o1, o2|o1.blocks.cmp(&o2.blocks));
-    for object in &to_draw {
-        object.draw(&mut tcod.con);
-    }
-
-    blit(
-        &tcod.con,                      //  The offscreen console
-        (0, 0),                         //  Starting coordinates
-        (map::MAP_WIDTH, map::MAP_HEIGHT),  // size to blit
-        &mut tcod.root,                 // blit destination
-        (0, 0),                         // Coordinates to blit to
-        1.0,                            // Forground opaque
-        1.0,                            // Background opaque
-    );
-
-    // prepare to render the GUI panel
-    tcod.panel.set_default_background(BLACK);
-    tcod.panel.clear();
-
-    // print game messages, one line at a time
-    let mut y = panel::MSG_HEIGHT as i32;
-    for &(ref msg, color) in game.messages.iter().rev() {
-        let msg_height = tcod.panel.get_height_rect(panel::MSG_X, y, panel::MSG_WIDTH, 0, msg);
-        y -= msg_height;
-        if y < 0 { break; }
-        tcod.panel.set_default_background(color);
-        tcod.panel.print_rect(panel::MSG_X, y, panel::MSG_WIDTH, 0, msg);
-    }
-
-    // show player's stats
-    let hp = objects[game_object::PLAYER].fighter.map_or(0, |f| f.hp);
-    let max_hp = objects[game_object::PLAYER].fighter.map_or(0, |f| f.max_hp);
-    panel::render_bar(
-        &mut tcod.panel,
-        1, 1,
-        panel::BAR_WIDTH,
-        "HP", hp, max_hp,
-        LIGHT_RED,
-        DARKER_RED
-    );
-
-    // display names of objects under the mouse
-    tcod.panel.set_default_background(LIGHT_GREY);
-    tcod.panel.print_ex(
-        1,
-        0,
-        BackgroundFlag::None,
-        TextAlignment::Left,
-        get_names_under_mouse(tcod.mouse, objects, &tcod.fov)
-    );
-
-    // blit the contents of `panel` to the root console
-    blit(
-        &tcod.panel,                    // The panel
-        (0, 0),                         //  Starting coordinates
-        (game::SCREEN_WIDTH, panel::PANEL_HEIGHT),  // size to blit
-        &mut tcod.root,                 // blit destination
-        (0, panel::PANEL_Y),                         // Coordinates to blit to
-        1.0,                            // Forground opaque
-        1.0,                            // Background opaque
-    );
-}
 
 fn ai_take_turn(monster_id: usize, tcod: &game::Tcod, game: &mut game::Game, objects: &mut[game_object::GameObject]) {
     use game_object::Ai::*;
@@ -291,7 +198,7 @@ fn ai_basic(monster_id: usize, tcod: &game::Tcod, game: &mut game::Game, objects
     game_object::Ai::Basic
 }
 
-fn ai_confused(monster_id: usize, tcod: &game::Tcod, game: &mut game::Game, objects: &mut[game_object::GameObject], previous_ai: Box<game_object::Ai>, num_turns: i32) -> game_object::Ai {
+fn ai_confused(monster_id: usize, _tcod: &game::Tcod, game: &mut game::Game, objects: &mut[game_object::GameObject], previous_ai: Box<game_object::Ai>, num_turns: i32) -> game_object::Ai {
     if num_turns >= 0 {
         // still confused
         // move a random direction and decrease confused turn count
@@ -304,17 +211,6 @@ fn ai_confused(monster_id: usize, tcod: &game::Tcod, game: &mut game::Game, obje
     } else {
         *previous_ai
     }
-}
-
-fn get_names_under_mouse(mouse: Mouse, objects: &[game_object::GameObject], fov_map: &FovMap) -> String {
-    let (x, y) = (mouse.cx as i32, mouse.cy as i32);
-    let names = objects
-        .iter()
-        .filter(|obj| obj.pos() == (x, y) && fov_map.is_in_fov(obj.x, obj.y))
-        .map(|obj| obj.name.clone())
-        .collect::<Vec<_>>();
-
-    names.join(", ")
 }
 
 

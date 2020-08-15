@@ -216,10 +216,19 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                 let mut object = GameObject::new(x, y, '!', "healing potion", VIOLET, false);
                 object.item = Some(Item::Heal);
                 object
-            } else {
+            } else if dice < 0.7 + 0.1 {
                 // lightning bolt scroll (30% chance)
                 let mut object = GameObject::new(x, y, '#', "scroll of lightning bolt", LIGHT_YELLOW, false);
                 object.item = Some(Item::Lightning);
+                object
+            } else if dice < 0.7 + 0.1 + 0.1 {
+                // lightning bolt scroll (30% chance)
+                let mut object = GameObject::new(x, y, '#', "scroll of fireball", LIGHT_YELLOW, false);
+                object.item = Some(Item::Fireball);
+                object
+            } else {
+                let mut object = GameObject::new(x, y, '#', "scroll of confusion", LIGHT_YELLOW, false);
+                object.item = Some(Item::Confuse);
                 object
             };
             objects.push(item);

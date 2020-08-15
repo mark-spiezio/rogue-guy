@@ -282,6 +282,14 @@ pub fn use_item(inventory_id: usize, tcod: &mut Tcod, game: &mut Game, objects: 
     }
 }
 
+pub fn drop_item(inventory_id: usize, game: &mut Game, objects: &mut Vec<GameObject>) {
+    let mut item = game.inventory.remove(inventory_id);
+    item.set_pos(objects[PLAYER].x, objects[PLAYER].y);
+    game.messages
+        .add(format!("You dropped a {}.", item.name), YELLOW);
+    objects.push(item);
+}
+
 fn cast_heal(
     _inventory_id: usize,
     _tcod: &mut Tcod,
@@ -334,8 +342,13 @@ fn cast_confuse(
     game: &mut Game,
     objects: &mut [GameObject],
 ) -> UseResult {
+    // ask the player for a target to confuse
+    game.messages.add(
+        "Left-click an enemy to confuse it, or right-click to cancel.",
+        LIGHT_CYAN,
+    );
     // find closest enemy and confuse it
-    let monster_id = closest_monster(tcod, objects, CONFUSE_RANGE);
+    let monster_id = target_monster(tcod, game, objects, Some(CONFUSE_RANGE as f32));
     if let Some(monster_id) = monster_id {
         let old_ai = objects[monster_id].ai.take().unwrap_or(Ai::Basic);
 
@@ -364,32 +377,32 @@ fn cast_fireball(
     game: &mut Game,
     objects: &mut [GameObject],
 ) -> UseResult {
-    // game.messages.add(
-    //     "Left-click a target tile for the fireball, or right-click to cancel.", 
-    //     LIGHT_CYAN);
-    // let (x,y) = match target_tile(tcod, game, objects, None) {
-    //     Some(tile_pos) => tile_pos,
-    //     None => return UseResult::Cancelled
-    // };
-    // game.messages.add(
-    //     format!(
-    //         "The fireball explodes, burning everything within {} tiles!",
-    //         FIREBALL_RADIUS
-    //     ), ORANGE
-    // );
+    game.messages.add(
+        "Left-click a target tile for the fireball, or right-click to cancel.", 
+        LIGHT_CYAN);
+    let (x,y) = match target_tile(tcod, game, objects, None) {
+        Some(tile_pos) => tile_pos,
+        None => return UseResult::Cancelled
+    };
+    game.messages.add(
+        format!(
+            "The fireball explodes, burning everything within {} tiles!",
+            FIREBALL_RADIUS
+        ), ORANGE
+    );
 
-    // for obj in objects {
-    //     if obj.distance(x,y) <= FIREBALL_RADIUS as f32 && obj.fighter.is_some() {
-    //         game.messages.add(
-    //             format!(
-    //                 "The {} gets burned for {} hit points.", 
-    //                 obj.name, FIREBALL_DAMAGE
-    //             ),
-    //             ORANGE
-    //         );
-    //         obj.take_damage(FIREBALL_DAMAGE, game);
-    //     }
-    // }
+    for obj in objects {
+        if obj.distance(x,y) <= FIREBALL_RADIUS as f32 && obj.fighter.is_some() {
+            game.messages.add(
+                format!(
+                    "The {} gets burned for {} hit points.", 
+                    obj.name, FIREBALL_DAMAGE
+                ),
+                ORANGE
+            );
+            obj.take_damage(FIREBALL_DAMAGE, game);
+        }
+    }
     UseResult::UsedUp
 }
 
@@ -415,43 +428,53 @@ fn closest_monster(tcod: &Tcod, objects: &[GameObject], max_range: i32) -> Optio
     closest_enemy
 }
 
-// pub fn target_tile(
-//     tcod: &mut Tcod,
-//     game: &mut Game,
-//     objects: &[GameObject],
-//     max_range: Option<f32>
-// ) -> Option<(i32,i32)> {
-//     use tcod::input::KeyCode::Escape;
-//     use tcod::input::{self, Event, Key, Mouse};
+pub fn target_tile(
+    tcod: &mut Tcod,
+    game: &mut Game,
+    objects: &[GameObject],
+    max_range: Option<f32>
+) -> Option<(i32,i32)> {
+    use tcod::input::KeyCode::Escape;
+    use tcod::input::{self, Event};
 
-//     loop {
-//         tcod.root.flush();
-//         let event = input::check_for_event(input::KEY_PRESS | input::MOUSE).map(|e|e.1);
-//         match event {
-//             Some(Event::Mouse(m)) => tcod.mouse = m,
-//             Some(Event::Key(k)) => tcod.key = k,
-//             None => tcod.key = Default::default()
-//         }
-//         render_all(tcod, game, objects, false);
+    loop {
+        tcod.root.flush();
+        let event = input::check_for_event(input::KEY_PRESS | input::MOUSE).map(|e|e.1);
+        match event {
+            Some(Event::Mouse(m)) => tcod.mouse = m,
+            Some(Event::Key(k)) => tcod.key = k,
+            None => tcod.key = Default::default()
+        }
+        render_all(tcod, game, objects, false);
 
-//         let (x,y) = (tcod.mouse.cx as i32, tcod.mouse.cy as i32);
+        let (x,y) = (tcod.mouse.cx as i32, tcod.mouse.cy as i32);
 
-//         // accept the target if the player clicked in FOV, and in case a range
-//         // is specified, if it's in that range
-//         let in_fov = (x < map::MAP_WIDTH) && (y < map::MAP_HEIGHT) && tcod.fov.is_in_fov(x,y);
-//         let in_range = max_range.map_or(true, |range| objects[game_object::PLAYER].distance(x,y) <= range);
-//         if tcod.mouse.lbutton_pressed && in_fov && in_range {
-//             return Some((x,y));
-//         }
+        // accept the target if the player clicked in FOV, and in case a range
+        // is specified, if it's in that range
+        let in_fov = (x < MAP_WIDTH) && (y < MAP_HEIGHT) && tcod.fov.is_in_fov(x,y);
+        let in_range = max_range.map_or(true, |range| objects[PLAYER].distance(x,y) <= range);
+        if tcod.mouse.lbutton_pressed && in_fov && in_range {
+            return Some((x,y));
+        }
 
-//         if tcod.mouse.rbutton_pressed || tcod.key.code == Escape {
-//             return None;
-//         }
-//     }
-// }
+        if tcod.mouse.rbutton_pressed || tcod.key.code == Escape {
+            return None;
+        }
+    }
+}
 
-// fn target_monster(tcod: &mut Tcod, game: &mut Game, objects: &[GameObject], max_range: Option<f32>) -> Option<usize> {
-//     loop {
-    
-//     }
-// }
+fn target_monster(tcod: &mut Tcod, game: &mut Game, objects: &[GameObject], max_range: Option<f32>) -> Option<usize> {
+    loop {
+        match target_tile(tcod, game, objects, max_range) {
+            Some((x,y)) => {
+                // return the first clicked monster, otherwise continue looping
+                for(id, obj) in objects.iter().enumerate() {
+                    if obj.pos() == (x, y) && obj.fighter.is_some() && id != PLAYER {
+                        return Some(id);
+                    }
+                }
+            }
+            None => return None
+        }
+    }
+}
