@@ -445,6 +445,7 @@ pub fn target_tile(
             Some(Event::Key(k)) => tcod.key = k,
             None => tcod.key = Default::default()
         }
+
         render_all(tcod, game, objects, false);
 
         let (x,y) = (tcod.mouse.cx as i32, tcod.mouse.cy as i32);
