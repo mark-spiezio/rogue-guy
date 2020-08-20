@@ -27,6 +27,5 @@ fn main() {
         mouse: Default::default()
     };
 
-    let (mut game, mut objects) = game::new_game(&mut tcod);
-    game::play_game(&mut tcod, &mut game, &mut objects);
+    menu::main_menu(&mut tcod);
 }

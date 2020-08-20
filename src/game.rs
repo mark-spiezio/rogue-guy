@@ -72,6 +72,9 @@ fn initialize_fov(tcod: &mut Tcod, map: &Map) {
             );
         }
     }
+
+    // unexplored areas start black (default background color)
+    tcod.con.clear();
 }
 
 pub fn play_game(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) {
