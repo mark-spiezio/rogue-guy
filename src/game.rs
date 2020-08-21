@@ -1,12 +1,17 @@
-use crate::map::*;
-use crate::panel::*;
-use crate::game_object::*;
-use crate::menu::*;
+use std::error::Error;
+use std::fs::File;
+use std::io::{Read, Write};
+use serde::{Deserialize, Serialize};
 
 use tcod::colors::*;
 use tcod::console::*;
 use tcod::input::*;
 use tcod::map::Map as FovMap;
+
+use crate::map::*;
+use crate::panel::*;
+use crate::game_object::*;
+use crate::menu::*;
 
 // window size
 pub const SCREEN_WIDTH: i32 = 80;
@@ -15,6 +20,7 @@ pub const SCREEN_HEIGHT: i32 = 50;
 // 20 frames per second maximum
 pub const LIMIT_FPS: i32 = 20;
 
+#[derive(Serialize, Deserialize)]
 pub struct Game {
     pub game_map: Map,
     pub messages: Messages,
@@ -60,7 +66,22 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
     (game, objects)
 }
 
-fn initialize_fov(tcod: &mut Tcod, map: &Map) {
+fn save_game(game: &Game, objects: &[GameObject]) -> Result<(), Box<dyn Error>> {
+    let save_data = serde_json::to_string(&(game, objects))?;
+    let mut file = File::create("savegame")?;
+    file.write_all(save_data.as_bytes())?;
+    Ok(())
+}
+
+pub fn load_game() -> Result<(Game, Vec<GameObject>), Box<dyn Error>> {
+    let mut json_save_state = String::new();
+    let mut file = File::open("savegame")?;
+    file.read_to_string(&mut json_save_state)?;
+    let result = serde_json::from_str::<(Game, Vec<GameObject>)>(&json_save_state)?;
+    Ok(result)
+}
+
+pub fn initialize_fov(tcod: &mut Tcod, map: &Map) {
     // populate FOV map, according to the generated map
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
@@ -100,6 +121,7 @@ pub fn play_game(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>
         previous_player_position = objects[PLAYER].pos();
         let player_action = handle_keys(tcod, game, objects);
         if player_action == PlayerAction::Exit {
+            save_game(game, objects).unwrap();
             break;
         }
 

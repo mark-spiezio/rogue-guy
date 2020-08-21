@@ -1,4 +1,5 @@
 use std::cmp;
+use serde::{Deserialize, Serialize};
 use tcod::colors::*;
 use tcod::console::*;
 use crate::game::*;
@@ -13,7 +14,7 @@ pub enum PlayerAction {
     Exit
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Fighter {
     pub max_hp: i32,
     pub hp: i32,
@@ -23,7 +24,7 @@ pub struct Fighter {
 }
 
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Ai {
     Basic,
     Confused {
@@ -32,7 +33,7 @@ pub enum Ai {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Item {
     Heal,
     Lightning,
@@ -48,7 +49,7 @@ const CONFUSE_RANGE: i32 = 8;
 const FIREBALL_RADIUS: i32 = 3;
 const FIREBALL_DAMAGE: i32 = 12;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GameObject {
     pub x: i32,
     pub y: i32,
@@ -204,7 +205,7 @@ pub fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (
 }
 
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DeathCallback {
     Player,
     Monster

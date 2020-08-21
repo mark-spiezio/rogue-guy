@@ -5,6 +5,11 @@ use tcod::console::*;
 
 const INVENTORY_MENU_WIDTH: i32 = 50;
 
+fn msgbox(text: &str, width: i32, root: &mut Root) {
+    let options: &[&str] = &[];
+    menu(text, options, width, root);
+}
+
 fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root) -> Option<usize> {
     assert!(options.len() <= 26,
         "Cannot have a menu with more than 26 options."
@@ -89,6 +94,20 @@ pub fn main_menu(tcod: &mut Tcod) {
                 // new game
                 let (mut game, mut objects) = new_game(tcod);
                 play_game(tcod, &mut game, &mut objects);
+            }
+            Some(1) => {
+                match load_game() {
+                    Ok((mut game, mut objects)) => {
+                        initialize_fov(tcod, &game.game_map);
+                        play_game(tcod, &mut game, &mut objects);
+                    }
+                    Err(_e) => {
+                        msgbox("\nNo saved game to load.\n", 24, &mut tcod.root);
+                        continue;
+                    }
+                }
+                
+
             }
             Some(2) => {
                 break; // quit

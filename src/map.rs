@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use tcod::colors::*;
 use tcod::map::{FovAlgorithm};
 use std::cmp;
@@ -28,7 +29,7 @@ const MAX_ROOM_ITEMS: i32 = 2;
 pub type Map = Vec<Vec<Tile>>;
 
 // A tile of the map and it's properties
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Tile {
     pub blocked: bool,
     pub block_sight: bool,
@@ -100,7 +101,6 @@ pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
 
             rooms.push(new_room);
         }
-
     }
     map
 }
