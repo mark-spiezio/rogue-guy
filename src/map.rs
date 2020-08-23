@@ -59,6 +59,9 @@ pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
     let mut rooms = vec![];
 
+    // for "next levels", remove any existing objects except the player
+    objects.retain(|i| i.name == "player");
+
     for _ in 0..MAX_ROOMS {
         // random width and height of room
         let w = rand::thread_rng().gen_range(ROOM_MIN_SIZE, ROOM_MAX_SIZE + 1);
@@ -98,10 +101,16 @@ pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
                     create_h_tunnel(prev_x, new_x, new_y, &mut map);
                 }
             }
-
             rooms.push(new_room);
         }
     }
+
+    // create stairs at the center of the last room
+    let(last_room_x, last_room_y) = rooms[rooms.len() - 1].center();
+    let mut stairs = GameObject::new(last_room_x, last_room_y, '<', "stairs", WHITE, false);
+    stairs.always_visible = true;
+    objects.push(stairs);
+
     map
 }
 
@@ -177,6 +186,7 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                     hp: 10,
                     defense: 0,
                     power: 3,
+                    xp: 35,
                     on_death: DeathCallback::Monster
                 });
                 orc.ai = Some(Ai::Basic);
@@ -189,6 +199,7 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                     hp: 16,
                     defense: 1,
                     power: 4,
+                    xp: 100,
                     on_death: DeathCallback::Monster
                 });
                 troll.ai = Some(Ai::Basic);
@@ -211,7 +222,7 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
         // only place it if the tle is not blocked
         if !is_blocked(x, y, map, objects) {
             let dice = rand::random::<f32>();
-            let item = if dice < 0.7 {
+            let mut item = if dice < 0.7 {
                 // healing potion (70% chance)
                 let mut object = GameObject::new(x, y, '!', "healing potion", VIOLET, false);
                 object.item = Some(Item::Heal);
@@ -231,6 +242,8 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                 object.item = Some(Item::Confuse);
                 object
             };
+
+            item.always_visible = true;
             objects.push(item);
         }
     }

@@ -25,6 +25,7 @@ pub struct Game {
     pub game_map: Map,
     pub messages: Messages,
     pub inventory: Vec<GameObject>,
+    dungeon_level: u8,
 }
 
 pub struct Tcod {
@@ -45,6 +46,7 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
         hp: 30,
         defense: 2,
         power: 5,
+        xp: 0,
         on_death: DeathCallback::Player,
     });
 
@@ -54,6 +56,7 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
         game_map: make_map(&mut objects),
         messages: Messages::new(),
         inventory: vec![],
+        dungeon_level: 1
     };
 
     initialize_fov(tcod, &game.game_map);
@@ -117,6 +120,9 @@ pub fn play_game(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>
 
         tcod.root.flush();
 
+        // level up if needed
+        level_up(tcod, game, objects);
+
         // handle keys and exit game if needed
         previous_player_position = objects[PLAYER].pos();
         let player_action = handle_keys(tcod, game, objects);
@@ -156,22 +162,43 @@ fn handle_keys(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) 
             DidntTakeTurn
         }
         (Key { code: Escape, .. }, _, _) => Exit,
-        (Key { code: Up, .. }, _, true) => {
+        // movement keys
+        (Key { code: Up, .. }, _, true) | (Key { code: NumPad8, .. }, _, true) => {
             player_move_or_attack(0, -1, game, objects);
             TookTurn
         }
-        (Key { code: Down, .. }, _, true) => {
+        (Key { code: Down, .. }, _, true) | (Key { code: NumPad2, .. }, _, true) => {
             player_move_or_attack(0, 1, game, objects);
             TookTurn
         }
-        (Key { code: Left, .. }, _, true) => {
+        (Key { code: Left, .. }, _, true) | (Key { code: NumPad4, .. }, _, true) => {
             player_move_or_attack(-1, 0, game, objects);
             TookTurn
         }
-        (Key { code: Right, .. }, _, true) => {
+        (Key { code: Right, .. }, _, true) | (Key { code: NumPad6, .. }, _, true) => {
             player_move_or_attack(1, 0, game, objects);
             TookTurn
         }
+        (Key { code: Home, .. }, _, true) | (Key { code: NumPad7, .. }, _, true) => {
+            player_move_or_attack(-1, -1, game, objects);
+            TookTurn
+        }
+        (Key { code: PageUp, .. }, _, true) | (Key { code: NumPad9, .. }, _, true) => {
+            player_move_or_attack(1, -1, game, objects);
+            TookTurn
+        }
+        (Key { code: End, .. }, _, true) | (Key { code: NumPad1, .. }, _, true) => {
+            player_move_or_attack(-1, 1, game, objects);
+            TookTurn
+        }
+        (Key { code: PageDown, .. }, _, true) | (Key { code: NumPad3, .. }, _, true) => {
+            player_move_or_attack(1, 1, game, objects);
+            TookTurn
+        }
+        (Key { code: NumPad5, .. }, _, true) => {
+            TookTurn // do nothing, i.e. wait for the monster to come to you
+        }
+        // "get" - pick up item
         (Key { code: Text, .. }, "g", true) => {
             let item_id = objects
                 .iter()
@@ -181,6 +208,7 @@ fn handle_keys(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) 
             }
             DidntTakeTurn
         }
+        // "drop" - drop item
         (Key { code: Text, .. }, "d", true) => {
             //show the inventory; if an item is selected, drop it
             let inventory_index = inventory_menu(&game.inventory, "", &mut tcod.root);
@@ -189,6 +217,7 @@ fn handle_keys(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) 
             }
             DidntTakeTurn
         }
+        // view inventory
         (Key { code: Text, .. }, "i", true) => {
             let inventory_index = inventory_menu(
                 &game.inventory,
@@ -200,10 +229,44 @@ fn handle_keys(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) 
             };
             DidntTakeTurn
         }
+        // take stairs
+        (Key {code: Text, ..}, "<", true) => {
+            let player_on_stairs = objects
+                .iter()
+                .any(|object| 
+                    object.pos() == objects[PLAYER].pos() 
+                    && object.name == "stairs");
+            if player_on_stairs {
+                next_level(tcod, game, objects);
+            }
+            DidntTakeTurn
+        }
+        // view character information
+        (Key {code: Text, ..}, "c", true) => {
+            character_information_msgbox(&objects[PLAYER], LEVEL_UP_BASE, LEVEL_UP_FACTOR, &mut tcod.root);
+            DidntTakeTurn
+        }
         _ => DidntTakeTurn,
     }
 }
 
+fn next_level(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) {
+    game.messages.add(
+        "You take a moment to rest, and recover your strength.", 
+        VIOLET
+    );
+    let heal_hp = objects[PLAYER].fighter.map_or(0, |f| f.max_hp / 2);
+    objects[PLAYER].heal(heal_hp);
+
+    game.messages.add(
+        "After a rare moment of peace, you descend deeper into \
+        the heart of the dundeon...", 
+        RED
+    );  
+    game.dungeon_level += 1;
+    game.game_map = make_map(objects);
+    initialize_fov(tcod, &game.game_map);
+}
 
 pub fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[GameObject], fov_recompute: bool) {
     if fov_recompute {
@@ -286,6 +349,14 @@ pub fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[GameObject], fov_
         max_hp,
         LIGHT_RED,
         DARKER_RED,
+    );
+
+    // display dungeon level
+    tcod.panel.print_ex(
+        1, 3, // (pos x,y)
+        BackgroundFlag::None, 
+        TextAlignment::Left,
+        format!("Dungeon level: {}", game.dungeon_level)
     );
 
     // display names of objects under the mouse

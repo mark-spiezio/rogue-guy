@@ -4,6 +4,7 @@ use tcod::colors::*;
 use tcod::console::*;
 use crate::game::*;
 use crate::map::*;
+use crate::menu::level_up_menu;
 
 pub const PLAYER: usize = 0;
 
@@ -20,6 +21,7 @@ pub struct Fighter {
     pub hp: i32,
     pub defense: i32,
     pub power: i32,
+    pub xp: i32,
     pub on_death: DeathCallback
 }
 
@@ -49,6 +51,9 @@ const CONFUSE_RANGE: i32 = 8;
 const FIREBALL_RADIUS: i32 = 3;
 const FIREBALL_DAMAGE: i32 = 12;
 
+pub const LEVEL_UP_BASE: i32 = 200;
+pub const LEVEL_UP_FACTOR: i32 = 150;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameObject {
     pub x: i32,
@@ -62,6 +67,7 @@ pub struct GameObject {
     pub ai: Option<Ai>,
     pub item: Option<Item>,
     pub always_visible: bool,
+    pub level: i32,
 }
 
 impl GameObject {
@@ -78,6 +84,7 @@ impl GameObject {
             ai: None,
             item: None,
             always_visible: false,
+            level: 1,
         }
     }
 
@@ -106,7 +113,7 @@ impl GameObject {
         ((dx.pow(2) + dy.pow(2)) as f32).sqrt()
     }
 
-    pub fn take_damage(&mut self, damage: i32, game: &mut Game) {
+    pub fn take_damage(&mut self, damage: i32, game: &mut Game) -> Option<i32> {
         // apply damage if possible
         if let Some(fighter) = self.fighter.as_mut() {
             if damage > 0 {
@@ -118,8 +125,10 @@ impl GameObject {
             if fighter.hp <= 0 {
                 self.alive = false;
                 fighter.on_death.callback(self, game);
+                return Some(fighter.xp);
             }
         }
+        None
     }
 
     pub fn attack(&mut self, target: &mut GameObject, game: &mut Game) {
@@ -127,7 +136,9 @@ impl GameObject {
         let damage = self.fighter.map_or(0, |f| f.power) - target.fighter.map_or(0, |f| f.defense);
         if damage > 0 {
             game.messages.add(format!("{} attacks {} for {} hit points.", self.name, target.name, damage), WHITE);
-            target.take_damage(damage, game);
+            if let Some(xp) = target.take_damage(damage, game) {
+                self.fighter.as_mut().unwrap().xp += xp;
+            }
         } else {
             game.messages.add(format!("{} attacks {} but it has no effect!", self.name, target.name), WHITE);
         }
@@ -251,6 +262,35 @@ pub fn pick_item_up(object_id: usize, game: &mut Game, objects: &mut Vec<GameObj
     }
 }
 
+pub fn level_up(tcod: &mut Tcod, game: &mut Game, objects: &mut [GameObject]) {
+    let player = &mut objects[PLAYER];
+    let level_up_xp = LEVEL_UP_BASE + player.level * LEVEL_UP_FACTOR;
+    if player.fighter.as_ref().map_or(0, |f| f.xp) >= level_up_xp {
+        player.level += 1;
+        game.messages.add(format!(
+            "Your battle skills grow stronger!  You reached level {}!",
+            player.level
+        ), YELLOW);
+
+        let choice = level_up_menu(player, &mut tcod.root);
+        let fighter = player.fighter.as_mut().unwrap();
+        fighter.xp -= level_up_xp;
+        match choice.unwrap() {
+            0 => {
+                fighter.max_hp += 20;
+                fighter.hp += 20;
+            }
+            1 => {
+                fighter.power += 1;
+            }
+            2 => {
+                fighter.defense += 1;
+            }
+            _ => unreachable!()
+        }
+    }
+}
+
 enum UseResult {
     UsedUp,
     Cancelled,
@@ -329,7 +369,9 @@ fn cast_lightning(
             ),
             LIGHT_BLUE
         );
-        objects[monster_id].take_damage(LIGHTNING_DAMAGE, game);
+        if let Some(xp) = objects[monster_id].take_damage(LIGHTNING_DAMAGE, game) {
+            objects[PLAYER].fighter.as_mut().unwrap().xp += xp;
+        }
         UseResult::UsedUp
     } else {
         game.messages.add("No enemy is close enough to strike.", RED);
@@ -392,7 +434,8 @@ fn cast_fireball(
         ), ORANGE
     );
 
-    for obj in objects {
+    let mut xp_to_gain = 0;
+    for (id, obj) in objects.iter_mut().enumerate() {
         if obj.distance(x,y) <= FIREBALL_RADIUS as f32 && obj.fighter.is_some() {
             game.messages.add(
                 format!(
@@ -401,9 +444,15 @@ fn cast_fireball(
                 ),
                 ORANGE
             );
-            obj.take_damage(FIREBALL_DAMAGE, game);
+            if let Some(xp) = obj.take_damage(FIREBALL_DAMAGE, game) {
+                if id != PLAYER { 
+                    xp_to_gain += xp; 
+                }
+            }
         }
     }
+    objects[PLAYER].fighter.as_mut().unwrap().xp += xp_to_gain;
+
     UseResult::UsedUp
 }
 

@@ -4,6 +4,8 @@ use tcod::colors::*;
 use tcod::console::*;
 
 const INVENTORY_MENU_WIDTH: i32 = 50;
+const LEVEL_SCREEN_WIDTH: i32 = 40;
+const CHARACTER_SCREEN_WIDTH: i32 = 30;
 
 fn msgbox(text: &str, width: i32, root: &mut Root) {
     let options: &[&str] = &[];
@@ -132,5 +134,43 @@ pub fn inventory_menu(inventory: &[GameObject], header: &str, root: &mut Root) -
         inventory_index
     } else {
         None
+    }
+}
+
+pub fn level_up_menu(player: &mut GameObject, root: &mut Root) -> Option<usize> {
+    let fighter = player.fighter.as_mut().unwrap();
+    let mut choice = None;
+    while choice.is_none() {
+        choice = menu(
+            "Level up! Choose a stat to raise:\n",
+            &[
+                format!("Constitution (+20 HP, from {})", fighter.max_hp),
+                format!("Strength (+1 attack, from {})", fighter.power),
+                format!("Agility (+1 defense, from {})", fighter.defense),
+            ],
+            LEVEL_SCREEN_WIDTH,
+            root
+        );
+    }
+    choice
+}
+
+pub fn character_information_msgbox(player: &GameObject, base: i32, factor: i32, root: &mut Root) {
+    let level = player.level;
+    let level_up_xp = base + player.level * factor;
+    if let Some(fighter) = player.fighter.as_ref() {
+        let msg = format!(
+            "Character information
+            
+Level: {}
+Experience: {}
+Experience to level up: {}
+
+Maximum HP: {}
+Attack: {}
+Defense: {}",
+            level, fighter.xp, level_up_xp, fighter.max_hp, fighter.power, fighter.defense
+        );
+        msgbox(&msg, CHARACTER_SCREEN_WIDTH, root);
     }
 }
