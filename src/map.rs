@@ -1,17 +1,30 @@
-use serde::{Deserialize, Serialize};
-use tcod::colors::*;
-use tcod::map::{FovAlgorithm};
-use std::cmp;
-use rand::Rng;
 use crate::game_object::*;
+
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::cmp;
+use tcod::colors::*;
+use tcod::map::FovAlgorithm;
 
 pub const MAP_WIDTH: i32 = 80;
 pub const MAP_HEIGHT: i32 = 43;
 
 pub const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
-pub const COLOR_LIGHT_WALL: Color = Color { r: 130, g: 110, b: 50 };
-pub const COLOR_DARK_GROUND: Color = Color { r: 50, g: 50, b: 150 };
-pub const COLOR_LIGHT_GROUND: Color = Color { r: 200, g: 180, b: 50 };
+pub const COLOR_LIGHT_WALL: Color = Color {
+    r: 130,
+    g: 110,
+    b: 50,
+};
+pub const COLOR_DARK_GROUND: Color = Color {
+    r: 50,
+    g: 50,
+    b: 150,
+};
+pub const COLOR_LIGHT_GROUND: Color = Color {
+    r: 200,
+    g: 180,
+    b: 50,
+};
 
 const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
@@ -33,7 +46,7 @@ pub type Map = Vec<Vec<Tile>>;
 pub struct Tile {
     pub blocked: bool,
     pub block_sight: bool,
-    pub explored: bool
+    pub explored: bool,
 }
 
 impl Tile {
@@ -41,7 +54,7 @@ impl Tile {
         Tile {
             blocked: false,
             block_sight: false,
-            explored: false
+            explored: false,
         }
     }
 
@@ -49,12 +62,12 @@ impl Tile {
         Tile {
             blocked: true,
             block_sight: true,
-            explored: false
+            explored: false,
         }
     }
 }
 
-pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
+pub fn make_map(objects: &mut Vec<GameObject>, level: u32) -> Map {
     // fill map with "blocked" tiles
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
     let mut rooms = vec![];
@@ -79,19 +92,18 @@ pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
         // No intersections, lets create the new room
         if !failed {
             create_room(new_room, &mut map);
-            place_objects(new_room, &map, objects);
+            place_objects(new_room, &map, objects, level);
 
             let (new_x, new_y) = new_room.center();
 
             if rooms.is_empty() {
                 // This is the first room, set the player here
                 objects[PLAYER].set_pos(new_x, new_y);
-
             } else {
                 // All the other rooms, connect to the previous room
                 // with a tunnel
 
-                let(prev_x, prev_y) = rooms[rooms.len() -1].center();
+                let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
 
                 if rand::random() {
                     create_h_tunnel(prev_x, new_x, prev_y, &mut map);
@@ -106,7 +118,7 @@ pub fn make_map(objects: &mut Vec<GameObject>) -> Map {
     }
 
     // create stairs at the center of the last room
-    let(last_room_x, last_room_y) = rooms[rooms.len() - 1].center();
+    let (last_room_x, last_room_y) = rooms[rooms.len() - 1].center();
     let mut stairs = GameObject::new(last_room_x, last_room_y, '<', "stairs", WHITE, false);
     stairs.always_visible = true;
     objects.push(stairs);
@@ -120,7 +132,7 @@ struct Rect {
     x1: i32,
     y1: i32,
     x2: i32,
-    y2: i32
+    y2: i32,
 }
 
 impl Rect {
@@ -129,16 +141,14 @@ impl Rect {
             x1: x,
             y1: y,
             x2: x + w,
-            y2: y + h
+            y2: y + h,
         }
     }
-    
     pub fn center(&self) -> (i32, i32) {
         let center_x = (self.x1 + self.x2) / 2;
         let center_y = (self.y1 + self.y2) / 2;
         (center_x, center_y)
     }
-    
     pub fn intersects_with(&self, other: &Rect) -> bool {
         (self.x1 <= other.x2)
             && (self.x2 >= other.x1)
@@ -167,19 +177,24 @@ fn create_v_tunnel(y1: i32, y2: i32, x: i32, map: &mut Map) {
     }
 }
 
-fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
+fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u32) {
     use rand::distributions::{IndependentSample, Weighted, WeightedChoice};
+    use crate::transition::*;
+
+    // maximum number of monsters per room
+    let max_monsters = from_dungeon_level(&[Transition { level: 1, value: 2 }], level);
+
     // choose random number of monsters
     let num_monsters = rand::thread_rng().gen_range(0, MAX_ROOM_MONSTERS + 1);
     let monster_chances = &mut [
         Weighted {
             weight: 80,
-            item: "orc"
+            item: "orc",
         },
         Weighted {
             weight: 20,
-            item: "troll"
-        }
+            item: "troll",
+        },
     ];
     let monster_choice = WeightedChoice::new(monster_chances);
 
@@ -199,11 +214,11 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                         defense: 0,
                         power: 3,
                         xp: 35,
-                        on_death: DeathCallback::Monster
+                        on_death: DeathCallback::Monster,
                     });
                     orc.ai = Some(Ai::Basic);
                     orc
-                }  
+                }
                 "troll" => {
                     // 20% chance of getting a troll
                     let mut troll = GameObject::new(x, y, 'T', "troll", DARKER_GREEN, true);
@@ -213,14 +228,13 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
                         defense: 1,
                         power: 4,
                         xp: 100,
-                        on_death: DeathCallback::Monster
+                        on_death: DeathCallback::Monster,
                     });
                     troll.ai = Some(Ai::Basic);
                     troll
                 }
-                _ => unreachable!()
+                _ => unreachable!(),
             };
-                
             monster.alive = true;
             objects.push(monster);
         }
@@ -231,20 +245,20 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
     let item_chances = &mut [
         Weighted {
             weight: 70,
-            item: Item::Heal
+            item: Item::Heal,
         },
         Weighted {
             weight: 10,
-            item: Item::Lightning
+            item: Item::Lightning,
         },
         Weighted {
             weight: 10,
-            item: Item::Fireball
+            item: Item::Fireball,
         },
         Weighted {
             weight: 10,
-            item: Item::Confuse
-        },                        
+            item: Item::Confuse,
+        },
     ];
     let item_choice = WeightedChoice::new(item_chances);
 
@@ -256,25 +270,30 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>) {
         // only place it if the tle is not blocked
         if !is_blocked(x, y, map, objects) {
             let dice = rand::random::<f32>();
-            let mut item = if dice < 0.7 {
-                // healing potion (70% chance)
-                let mut object = GameObject::new(x, y, '!', "healing potion", VIOLET, false);
-                object.item = Some(Item::Heal);
-                object
-            } else if dice < 0.7 + 0.1 {
-                // lightning bolt scroll (30% chance)
-                let mut object = GameObject::new(x, y, '#', "scroll of lightning bolt", LIGHT_YELLOW, false);
-                object.item = Some(Item::Lightning);
-                object
-            } else if dice < 0.7 + 0.1 + 0.1 {
-                // lightning bolt scroll (30% chance)
-                let mut object = GameObject::new(x, y, '#', "scroll of fireball", LIGHT_YELLOW, false);
-                object.item = Some(Item::Fireball);
-                object
-            } else {
-                let mut object = GameObject::new(x, y, '#', "scroll of confusion", LIGHT_YELLOW, false);
-                object.item = Some(Item::Confuse);
-                object
+            let mut item = match item_choice.ind_sample(&mut rand::thread_rng()) {
+                Item::Heal => {
+                    let mut object = GameObject::new(x, y, '!', "healing potion", VIOLET, false);
+                    object.item = Some(Item::Heal);
+                    object
+                }
+                Item::Lightning => {
+                    let mut object =
+                        GameObject::new(x, y, '#', "scroll of lightning bolt", LIGHT_YELLOW, false);
+                    object.item = Some(Item::Lightning);
+                    object
+                }
+                Item::Fireball => {
+                    let mut object =
+                        GameObject::new(x, y, '#', "scroll of fireball", LIGHT_YELLOW, false);
+                    object.item = Some(Item::Fireball);
+                    object
+                }
+                Item::Confuse => {
+                    let mut object =
+                        GameObject::new(x, y, '#', "scroll of confusion", LIGHT_YELLOW, false);
+                    object.item = Some(Item::Confuse);
+                    object
+                }
             };
 
             item.always_visible = true;

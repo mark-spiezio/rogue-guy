@@ -25,7 +25,7 @@ pub struct Game {
     pub game_map: Map,
     pub messages: Messages,
     pub inventory: Vec<GameObject>,
-    dungeon_level: u8,
+    pub dungeon_level: u32,
 }
 
 pub struct Tcod {
@@ -53,7 +53,7 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
     let mut objects = vec![player];
 
     let mut game = Game {
-        game_map: make_map(&mut objects),
+        game_map: make_map(&mut objects, 1),
         messages: Messages::new(),
         inventory: vec![],
         dungeon_level: 1
@@ -264,7 +264,7 @@ fn next_level(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) {
         RED
     );  
     game.dungeon_level += 1;
-    game.game_map = make_map(objects);
+    game.game_map = make_map(objects, game.dungeon_level);
     initialize_fov(tcod, &game.game_map);
 }
 
