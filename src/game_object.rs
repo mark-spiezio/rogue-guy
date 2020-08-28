@@ -43,13 +43,13 @@ pub enum Item {
     Fireball,
 }
 
-const HEAL_AMOUNT: i32 = 4;
+const HEAL_AMOUNT: i32 = 40;
 const LIGHTNING_DAMAGE: i32 = 40;
 const LIGHTNING_RANGE: i32 = 5;
 const CONFUSE_NUM_TURNS: i32 = 10;
 const CONFUSE_RANGE: i32 = 8;
 const FIREBALL_RADIUS: i32 = 3;
-const FIREBALL_DAMAGE: i32 = 12;
+const FIREBALL_DAMAGE: i32 = 25;
 
 pub const LEVEL_UP_BASE: i32 = 200;
 pub const LEVEL_UP_FACTOR: i32 = 150;

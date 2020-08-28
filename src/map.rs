@@ -34,10 +34,6 @@ pub const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 pub const FOV_LIGHT_WALLS: bool = true;
 pub const TORCH_RADIUS: i32 = 10;
 
-const MAX_ROOM_MONSTERS: i32 = 3;
-
-const MAX_ROOM_ITEMS: i32 = 2;
-
 // alias Vec<Vec<Tile>> to "Map"
 pub type Map = Vec<Vec<Tile>>;
 
@@ -182,17 +178,35 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
     use crate::transition::*;
 
     // maximum number of monsters per room
-    let max_monsters = from_dungeon_level(&[Transition { level: 1, value: 2 }], level);
+    let max_monsters = from_dungeon_level(
+        &[
+            Transition { level: 1, value: 2 },
+            Transition { level: 4, value: 3 },
+            Transition { level: 6, value: 5 }
+        ], 
+        level
+    );
 
     // choose random number of monsters
-    let num_monsters = rand::thread_rng().gen_range(0, MAX_ROOM_MONSTERS + 1);
+    let num_monsters = rand::thread_rng().gen_range(0, max_monsters + 1);
+
+    // monster random table
+    let troll_chance = from_dungeon_level(
+        &[
+            Transition { level: 3, value: 15 },
+            Transition { level: 5, value: 30 },
+            Transition { level: 7, value: 60 },
+        ], 
+        level
+    );
+
     let monster_chances = &mut [
         Weighted {
             weight: 80,
             item: "orc",
         },
         Weighted {
-            weight: 20,
+            weight: troll_chance,
             item: "troll",
         },
     ];
@@ -209,10 +223,10 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
                 "orc" => {
                     let mut orc = GameObject::new(x, y, 'o', "orc", DESATURATED_GREEN, true);
                     orc.fighter = Some(Fighter {
-                        max_hp: 10,
-                        hp: 10,
+                        max_hp: 20,
+                        hp: 20,
                         defense: 0,
-                        power: 3,
+                        power: 4,
                         xp: 35,
                         on_death: DeathCallback::Monster,
                     });
@@ -223,10 +237,10 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
                     // 20% chance of getting a troll
                     let mut troll = GameObject::new(x, y, 'T', "troll", DARKER_GREEN, true);
                     troll.fighter = Some(Fighter {
-                        max_hp: 16,
-                        hp: 16,
-                        defense: 1,
-                        power: 4,
+                        max_hp: 30,
+                        hp: 30,
+                        defense: 2,
+                        power: 8,
                         xp: 100,
                         on_death: DeathCallback::Monster,
                     });
@@ -240,28 +254,36 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
         }
     }
 
+    let max_items = from_dungeon_level(
+        &[
+            Transition { level: 1, value: 1 },
+            Transition { level: 4, value: 2 },
+        ], 
+        level
+    );
+
     // choose random number of items
-    let num_items = rand::thread_rng().gen_range(0, MAX_ROOM_ITEMS + 1);
     let item_chances = &mut [
         Weighted {
-            weight: 70,
+            weight: 35,
             item: Item::Heal,
         },
         Weighted {
-            weight: 10,
+            weight: from_dungeon_level(&[Transition { level: 2, value: 10}], level),
+            item: Item::Confuse,
+        },
+        Weighted {
+            weight: from_dungeon_level(&[Transition { level: 4, value: 25}], level),
             item: Item::Lightning,
         },
         Weighted {
-            weight: 10,
+            weight: from_dungeon_level(&[Transition { level: 6, value: 25}], level),
             item: Item::Fireball,
-        },
-        Weighted {
-            weight: 10,
-            item: Item::Confuse,
         },
     ];
     let item_choice = WeightedChoice::new(item_chances);
 
+    let num_items = rand::thread_rng().gen_range(0, max_items + 1);
     for _ in 0..num_items {
         // choose random spot for this item
         let x = rand::thread_rng().gen_range(room.x1 + 1, room.x2);
@@ -269,7 +291,6 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
 
         // only place it if the tle is not blocked
         if !is_blocked(x, y, map, objects) {
-            let dice = rand::random::<f32>();
             let mut item = match item_choice.ind_sample(&mut rand::thread_rng()) {
                 Item::Heal => {
                     let mut object = GameObject::new(x, y, '!', "healing potion", VIOLET, false);

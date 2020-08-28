@@ -42,10 +42,10 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
     let mut player = GameObject::new(0, 0, '@', "player", WHITE, true);
     player.alive = true;
     player.fighter = Some(Fighter {
-        max_hp: 30,
-        hp: 30,
-        defense: 2,
-        power: 5,
+        max_hp: 100,
+        hp: 100,
+        defense: 1,
+        power: 4,
         xp: 0,
         on_death: DeathCallback::Player,
     });
