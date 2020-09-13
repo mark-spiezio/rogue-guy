@@ -7,6 +7,7 @@ mod map;
 mod menu;
 mod panel;
 mod transition;
+mod equipment;
 
 fn main() {
     tcod::system::set_fps(game::LIMIT_FPS);

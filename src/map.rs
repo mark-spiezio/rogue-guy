@@ -176,6 +176,7 @@ fn create_v_tunnel(y1: i32, y2: i32, x: i32, map: &mut Map) {
 fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u32) {
     use rand::distributions::{IndependentSample, Weighted, WeightedChoice};
     use crate::transition::*;
+    use crate::equipment::*;
 
     // maximum number of monsters per room
     let max_monsters = from_dungeon_level(
@@ -223,10 +224,10 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
                 "orc" => {
                     let mut orc = GameObject::new(x, y, 'o', "orc", DESATURATED_GREEN, true);
                     orc.fighter = Some(Fighter {
-                        max_hp: 20,
+                        base_max_hp: 20,
                         hp: 20,
-                        defense: 0,
-                        power: 4,
+                        base_defense: 0,
+                        base_power: 4,
                         xp: 35,
                         on_death: DeathCallback::Monster,
                     });
@@ -237,10 +238,10 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
                     // 20% chance of getting a troll
                     let mut troll = GameObject::new(x, y, 'T', "troll", DARKER_GREEN, true);
                     troll.fighter = Some(Fighter {
-                        max_hp: 30,
+                        base_max_hp: 30,
                         hp: 30,
-                        defense: 2,
-                        power: 8,
+                        base_defense: 2,
+                        base_power: 8,
                         xp: 100,
                         on_death: DeathCallback::Monster,
                     });
@@ -280,6 +281,14 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
             weight: from_dungeon_level(&[Transition { level: 6, value: 25}], level),
             item: Item::Fireball,
         },
+        Weighted {
+            weight: from_dungeon_level(&[Transition { level: 4, value: 5}], level), 
+            item: Item::Sword
+        },
+        Weighted {
+            weight: from_dungeon_level(&[Transition { level: 8, value: 15}], level), 
+            item: Item::Shield
+        }
     ];
     let item_choice = WeightedChoice::new(item_chances);
 
@@ -313,6 +322,20 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<GameObject>, level: u3
                     let mut object =
                         GameObject::new(x, y, '#', "scroll of confusion", LIGHT_YELLOW, false);
                     object.item = Some(Item::Confuse);
+                    object
+                }
+                Item::Sword => {
+                    let mut object =
+                        GameObject::new(x, y, '/', "sword", SKY, false);
+                    object.item = Some(Item::Sword);
+                    object.equipment = Some(Equipment { equipped: false, slot: Slot::RightHand, max_hp_bonus: 0, defense_bonus: 0, power_bonus: 3 });
+                    object
+                }
+                Item::Shield => {
+                    let mut object =
+                        GameObject::new(x, y, '[', "shield", DARKER_ORANGE, false);
+                    object.item = Some(Item::Shield);
+                    object.equipment = Some(Equipment { equipped: false, slot: Slot::LeftHand, max_hp_bonus: 0, defense_bonus: 1, power_bonus: 0 });
                     object
                 }
             };

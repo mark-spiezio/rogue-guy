@@ -124,9 +124,17 @@ pub fn inventory_menu(inventory: &[GameObject], header: &str, root: &mut Root) -
     let options = if inventory.len() == 0 {
         vec!["Inventory is empty.".into()]
     } else {
-        inventory.iter().map(|item| item.name.clone()).collect()
+        inventory.iter().map(|item| {
+            //show additional information, in case it's equipped
+            match item.equipment {
+                Some(equipment) if equipment.equipped => {
+                    format!("{} (on {})", item.name, equipment.slot)
+                }
+                _ => item.name.clone()
+            }
+        }).collect()
     };
-
+    
     let inventory_index = menu(header, &options, INVENTORY_MENU_WIDTH, root);
 
     // if an item was chosen, return it
@@ -144,9 +152,9 @@ pub fn level_up_menu(player: &mut GameObject, root: &mut Root) -> Option<usize> 
         choice = menu(
             "Level up! Choose a stat to raise:\n",
             &[
-                format!("Constitution (+20 HP, from {})", fighter.max_hp),
-                format!("Strength (+1 attack, from {})", fighter.power),
-                format!("Agility (+1 defense, from {})", fighter.defense),
+                format!("Constitution (+20 HP, from {})", fighter.base_max_hp),
+                format!("Strength (+1 attack, from {})", fighter.base_power),
+                format!("Agility (+1 defense, from {})", fighter.base_defense),
             ],
             LEVEL_SCREEN_WIDTH,
             root
@@ -155,7 +163,12 @@ pub fn level_up_menu(player: &mut GameObject, root: &mut Root) -> Option<usize> 
     choice
 }
 
-pub fn character_information_msgbox(player: &GameObject, base: i32, factor: i32, root: &mut Root) {
+pub fn character_information_msgbox(
+    root: &mut Root,
+    game: &Game,
+    player: &GameObject, 
+    base: i32, 
+    factor: i32) {
     let level = player.level;
     let level_up_xp = base + player.level * factor;
     if let Some(fighter) = player.fighter.as_ref() {
@@ -169,7 +182,7 @@ Experience to level up: {}
 Maximum HP: {}
 Attack: {}
 Defense: {}",
-            level, fighter.xp, level_up_xp, fighter.max_hp, fighter.power, fighter.defense
+            level, fighter.xp, level_up_xp, player.max_hp(game), player.power(game), player.defense(game)
         );
         msgbox(&msg, CHARACTER_SCREEN_WIDTH, root);
     }

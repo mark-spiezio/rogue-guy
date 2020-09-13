@@ -38,14 +38,16 @@ pub struct Tcod {
 }
 
 pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
+    use crate::equipment::*;
+
     // create player object
     let mut player = GameObject::new(0, 0, '@', "player", WHITE, true);
     player.alive = true;
     player.fighter = Some(Fighter {
-        max_hp: 100,
+        base_max_hp: 100,
         hp: 100,
-        defense: 1,
-        power: 4,
+        base_defense: 1,
+        base_power: 2,
         xp: 0,
         on_death: DeathCallback::Player,
     });
@@ -58,6 +60,18 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
         inventory: vec![],
         dungeon_level: 1
     };
+
+    // initial equipment: a dagger
+    let mut dagger = GameObject::new(0, 0, '-', "dagger", SKY, false);
+    dagger.item = Some(Item::Sword);
+    dagger.equipment = Some(Equipment {
+        equipped: true,
+        slot: Slot::LeftHand,
+        max_hp_bonus: 0,
+        defense_bonus: 0,
+        power_bonus: 2,
+    });
+    game.inventory.push(dagger);
 
     initialize_fov(tcod, &game.game_map);
 
@@ -243,7 +257,7 @@ fn handle_keys(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) 
         }
         // view character information
         (Key {code: Text, ..}, "c", true) => {
-            character_information_msgbox(&objects[PLAYER], LEVEL_UP_BASE, LEVEL_UP_FACTOR, &mut tcod.root);
+            character_information_msgbox(&mut tcod.root, &game, &objects[PLAYER], LEVEL_UP_BASE, LEVEL_UP_FACTOR);
             DidntTakeTurn
         }
         _ => DidntTakeTurn,
@@ -255,8 +269,8 @@ fn next_level(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) {
         "You take a moment to rest, and recover your strength.", 
         VIOLET
     );
-    let heal_hp = objects[PLAYER].fighter.map_or(0, |f| f.max_hp / 2);
-    objects[PLAYER].heal(heal_hp);
+    let heal_hp = objects[PLAYER].max_hp(game) / 2;
+    objects[PLAYER].heal(heal_hp, game);
 
     game.messages.add(
         "After a rare moment of peace, you descend deeper into \
@@ -338,7 +352,7 @@ pub fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[GameObject], fov_
 
     // show player's stats
     let hp = objects[PLAYER].fighter.map_or(0, |f| f.hp);
-    let max_hp = objects[PLAYER].fighter.map_or(0, |f| f.max_hp);
+    let max_hp = objects[PLAYER].max_hp(game);
     render_bar(
         &mut tcod.panel,
         1,
