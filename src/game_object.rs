@@ -477,7 +477,7 @@ fn cast_lightning(
     if let Some(monster_id) = monster_id {
         game.messages.add(
             format!(
-                "A lightning bolt strikes the {} with a loud thunger! \
+                "A lightning bolt strikes the {} with a loud thunder! \
                  The damage is {} hit points.",
                  objects[monster_id].name, LIGHTNING_DAMAGE
             ),

@@ -76,7 +76,7 @@ pub fn new_game(tcod: &mut Tcod) -> (Game, Vec<GameObject>) {
     initialize_fov(tcod, &game.game_map);
 
     game.messages.add(
-        "Welcom stranger! Prepare to parish in the Tombs of the Ancient Kinds.",
+        "Welcome stranger! Prepare to parish in the Tombs of the Ancient Kings.",
         RED,
     );
 
@@ -274,7 +274,7 @@ fn next_level(tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<GameObject>) {
 
     game.messages.add(
         "After a rare moment of peace, you descend deeper into \
-        the heart of the dundeon...", 
+        the heart of the dungeon...", 
         RED
     );  
     game.dungeon_level += 1;
